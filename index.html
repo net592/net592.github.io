@@ -161,6 +161,248 @@
     <div class="cube-content">
         <div class="cube-left">
             
+<div class="cube-excerpt" id="cube-excerpt-[K8s 1.9实践]Kubeadm HA 1.9 高可用 集群 本地离线部署">
+    <header class="cube-excerpt-header">
+        <h1><a href="/2018/01/19/K8s-1-9实践-Kubeadm-HA-1-9-高可用-集群-本地离线部署/">[K8s 1.9实践]Kubeadm HA 1.9 高可用 集群 本地离线部署</a></h1>
+        <div class="cube-excerpt-header-msg">
+            <div class="cube-excerpt-date">
+                <i class="cube-icon cube-icon-date" aria-hidden="true"></i>
+                2018-01-19
+            </div>
+            <div class="cube-excerpt-tags">
+                <i class="cube-icon cube-icon-tag" aria-hidden="true"></i>
+                
+            </div>
+        </div>
+    </header>
+    <article class="cube-excerpt-entry cube-markdown">
+        
+        
+           <h1 id="Kubeadm-HA-1-9-高可用-集群-本地离线部署"><a href="#Kubeadm-HA-1-9-高可用-集群-本地离线部署" class="headerlink" title="Kubeadm HA 1.9 高可用 集群 本地离线部署"></a>Kubeadm HA 1.9 高可用 集群 本地离线部署</h1><h2 id=""><a href="#" class="headerlink" title="  "></a>  <img src="http://www.dnt.com.cn/uploads/images/ueditor/201706/1497841741442681.png" alt="image"></h2><ul>
+<li>k8s 发展速度很快，目前很多大的公司容器集群都基于该项目，如京东，腾讯，滴滴，瓜子二手车等等。<br><img src="http://www.dnt.com.cn/uploads/images/ueditor/201706/1497841975273487.png" alt="image"></li>
+<li>kubernetes1.9版本发布2017年12月15日，每是那三个月一个迭代， Workloads API成为稳定版本，这消除了很多潜在用户对于该功能稳定性的担忧。还有一个重大更新，就是测试支持了Windows了，这打开了在kubernetes中运行Windows工作负载的大门。</li>
+<li>CoreDNS alpha可以使用标准工具来安装CoreDNS</li>
+<li>kube-proxy的IPVS模式进入beta版，为大型集群提供更好的可扩展性和性能。</li>
+<li>kube-router的网络插件支持，更方便进行路由控制，发布，和安全策略管理</li>
+</ul>
+<hr>
+<h2 id="k8s-核心架构"><a href="#k8s-核心架构" class="headerlink" title="k8s 核心架构"></a>k8s 核心架构</h2><p><img src="http://omwdjgaw1.bkt.clouddn.com/blog/ha11.png" alt="image"><br>如架构图</p>
+<ul>
+<li>k8s 高可用2个核心 ==apiserver master== and ==etcd==</li>
+<li>==apiserver master==：（需高可用）集群核心，集群API接口、集群各个组件通信的中枢；集群安全控制；</li>
+<li>==etcd==  ：（需高可用）集群的数据中心，用于存放集群的配置以及状态信息，非常重要，如果数据丢失那么集群将无法恢复；因此高可用集群部署首先就是etcd是高可用集群；</li>
+<li>kube-scheduler：调度器 （内部自选举）集群Pod的调度中心；默认kubeadm安装情况下–leader-elect参数已经设置为true，保证master集群中只有一个kube-scheduler处于活跃状态；</li>
+<li>kube-controller-manager： 控制器 （内部自选举）集群状态管理器，当集群状态与期望不同时，kcm会努力让集群恢复期望状态，比如：当一个pod死掉，kcm会努力新建一个pod来恢复对应replicas set期望的状态；默认kubeadm安装情况下–leader-elect参数已经设置为true，保证master集群中只有一个kube-controller-manager处于活跃状态；</li>
+<li>kubelet: agent node注册apiserver</li>
+<li>kube-proxy: 每个node上一个，负责service vip到endpoint pod的流量转发，老版本主要通过设置iptables规则实现，新版1.9基于kube-proxy-lvs 实现</li>
+</ul>
+<hr>
+<h2 id="部署示意图"><a href="#部署示意图" class="headerlink" title="部署示意图"></a>部署示意图</h2><p><img src="http://omwdjgaw1.bkt.clouddn.com/blog/kubeadm-ha-map.jpg" alt="image"></p>
+<ul>
+<li>集群ha方案，我们力求简单，使用keepalive 监听一个vip来实现，（当节点不可以后，会有vip漂移的切换时长，取决于我们设置timeout切换时长，测试会有10s空档期，如果对高可用更高要求 可以用lvs或者nginx做 4层lb负载 更佳完美，我们力求简单够用，可接受10s的api不可用）</li>
+</ul>
+<hr>
+<h2 id="部署环境"><a href="#部署环境" class="headerlink" title="部署环境"></a>部署环境</h2><p>最近在部署k8s 1.9集群遇到一些问题，整理记录，或许帮一些朋友。</p>
+<h2 id="因为kubeadm-简单便捷，所以集群基于该项目部署，目前bete版本不支持ha部署，github说2018年预计发布ha-版本，可我们等不及。。。"><a href="#因为kubeadm-简单便捷，所以集群基于该项目部署，目前bete版本不支持ha部署，github说2018年预计发布ha-版本，可我们等不及。。。" class="headerlink" title="因为kubeadm 简单便捷，所以集群基于该项目部署，目前bete版本不支持ha部署，github说2018年预计发布ha 版本，可我们等不及。。。"></a>因为kubeadm 简单便捷，所以集群基于该项目部署，目前bete版本不支持ha部署，github说2018年预计发布ha 版本，可我们等不及。。。</h2><table>
+<thead>
+<tr>
+<th>环境</th>
+<th>版本</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Centos</td>
+<td>CentOS Linux release 7.3.1611 (Core)</td>
+</tr>
+<tr>
+<td>Kernel</td>
+<td>Linux etcd-host1 3.10.0-514.el7.x86_64 </td>
+</tr>
+<tr>
+<td>yum base repo</td>
+<td><a href="http://mirrors.aliyun.com/repo/Centos-7.repo" target="_blank" rel="noopener">http://mirrors.aliyun.com/repo/Centos-7.repo</a></td>
+</tr>
+<tr>
+<td>yum epel repo</td>
+<td><a href="http://mirrors.aliyun.com/repo/epel-7.repo" target="_blank" rel="noopener">http://mirrors.aliyun.com/repo/epel-7.repo</a></td>
+</tr>
+<tr>
+<td>kubectl</td>
+<td>v1.9.0</td>
+</tr>
+<tr>
+<td>kubeadmin</td>
+<td>v1.9.0</td>
+</tr>
+<tr>
+<td>docker</td>
+<td>1.12.6</td>
+</tr>
+<tr>
+<td>docker localre</td>
+<td>devhub.beisencorp.com</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<table>
+<thead>
+<tr>
+<th>主机名称</th>
+<th>相关信息</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>etcd-host1</td>
+<td>10.129.6.211</td>
+<td>master和etcd</td>
+</tr>
+<tr>
+<td>etcd-host2</td>
+<td>10.129.6.212</td>
+<td>master和etcd</td>
+</tr>
+<tr>
+<td>etcd-host3</td>
+<td>10.129.6.213</td>
+<td>master和etcd</td>
+</tr>
+<tr>
+<td>Vip-keepalive</td>
+<td>10.129.6.220</td>
+<td>vip用于高可用</td>
+</tr>
+</tbody>
+</table>
+<h1 id="环境部署-（我们使用本地离线镜像）"><a href="#环境部署-（我们使用本地离线镜像）" class="headerlink" title="环境部署 （我们使用本地离线镜像）"></a>环境部署 （我们使用本地离线镜像）</h1><h3 id="环境预初始化"><a href="#环境预初始化" class="headerlink" title="环境预初始化"></a>环境预初始化</h3><ul>
+<li>Centos Mini安装 每台机器root</li>
+<li>设置机器名</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hostnamectl set-hostname etcd-host1</span><br></pre></td></tr></table></figure>
+<ul>
+<li>停防火墙</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">systemctl stop firewalld</span><br><span class="line">systemctl disable firewalld</span><br><span class="line">systemctl disable firewalld</span><br></pre></td></tr></table></figure>
+<ul>
+<li>关闭Swap</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">swapoff -a </span><br><span class="line">sed &apos;s/.*swap.*/#&amp;/&apos; /etc/fstab</span><br></pre></td></tr></table></figure>
+<ul>
+<li>关闭防火墙</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl disable firewalld &amp;&amp; systemctl stop firewalld &amp;&amp; systemctl status firewalld</span><br></pre></td></tr></table></figure>
+<ul>
+<li>关闭Selinux</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">setenforce  0 </span><br><span class="line">sed -i &quot;s/^SELINUX=enforcing/SELINUX=disabled/g&quot; /etc/sysconfig/selinux </span><br><span class="line">sed -i &quot;s/^SELINUX=enforcing/SELINUX=disabled/g&quot; /etc/selinux/config </span><br><span class="line">sed -i &quot;s/^SELINUX=permissive/SELINUX=disabled/g&quot; /etc/sysconfig/selinux </span><br><span class="line">sed -i &quot;s/^SELINUX=permissive/SELINUX=disabled/g&quot; /etc/selinux/config </span><br><span class="line"></span><br><span class="line">getenforce</span><br></pre></td></tr></table></figure>
+<ul>
+<li>增加DNS</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">echo nameserver 114.114.114.114&gt;&gt;/etc/resolv.conf</span><br></pre></td></tr></table></figure>
+<ul>
+<li>设置内核</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">cat &lt;&lt;EOF &gt;  /etc/sysctl.d/k8s.conf</span><br><span class="line">net.bridge.bridge-nf-call-ip6tables = 1</span><br><span class="line">net.bridge.bridge-nf-call-iptables = 1</span><br><span class="line">EOF</span><br><span class="line">sysctl -p /etc/sysctl.conf</span><br><span class="line"></span><br><span class="line">#若问题</span><br><span class="line">执行sysctl -p 时出现：</span><br><span class="line">sysctl -p</span><br><span class="line">sysctl: cannot stat /proc/sys/net/bridge/bridge-nf-call-ip6tables: No such file or directory</span><br><span class="line">sysctl: cannot stat /proc/sys/net/bridge/bridge-nf-call-iptables: No such file or directory</span><br><span class="line"> </span><br><span class="line">解决方法：</span><br><span class="line">modprobe br_netfilter</span><br><span class="line">ls /proc/sys/net/bridge</span><br></pre></td></tr></table></figure>
+<h2 id="配置VIP-Master-keepalived"><a href="#配置VIP-Master-keepalived" class="headerlink" title="配置VIP Master keepalived"></a>配置VIP Master keepalived</h2><ul>
+<li>到目前为止,三个master节点 相互独立运行,互补干扰. kube-apiserver作为核心入口, 可以使用keepalived 实现高可用, kubeadm join暂时不支持负载均衡的方式,所以我们</li>
+<li>安装</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">yum install -y keepalived</span><br></pre></td></tr></table></figure>
+<ul>
+<li>配置keepalived.conf</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line">cat &gt;/etc/keepalived/keepalived.conf  &lt;&lt;EOL</span><br><span class="line">global_defs &#123;</span><br><span class="line">   router_id LVS_k8s</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">vrrp_script CheckK8sMaster &#123;</span><br><span class="line">    script &quot;curl -k https://10.129.6.220:6443&quot;</span><br><span class="line">    interval 3</span><br><span class="line">    timeout 9</span><br><span class="line">    fall 2</span><br><span class="line">    rise 2</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">vrrp_instance VI_1 &#123;</span><br><span class="line">    state MASTER</span><br><span class="line">    interface ens32</span><br><span class="line">    virtual_router_id 61</span><br><span class="line">    # 主节点权重最高 依次减少</span><br><span class="line">    priority 120</span><br><span class="line">    advert_int 1</span><br><span class="line">    #修改为本地IP </span><br><span class="line">    mcast_src_ip 10.129.6.211</span><br><span class="line">    nopreempt</span><br><span class="line">    authentication &#123;</span><br><span class="line">        auth_type PASS</span><br><span class="line">        auth_pass sqP05dQgMSlzrxHj</span><br><span class="line">    &#125;</span><br><span class="line">    unicast_peer &#123;</span><br><span class="line">        #注释掉本地IP</span><br><span class="line">        #10.129.6.211</span><br><span class="line">        10.129.6.212</span><br><span class="line">        10.129.6.213</span><br><span class="line">    &#125;</span><br><span class="line">    virtual_ipaddress &#123;</span><br><span class="line">        10.129.6.220/24</span><br><span class="line">    &#125;</span><br><span class="line">    track_script &#123;</span><br><span class="line">        CheckK8sMaster</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br><span class="line">EOL</span><br></pre></td></tr></table></figure>
+<ul>
+<li>启动</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl enable keepalived &amp;&amp; systemctl restart keepalived</span><br></pre></td></tr></table></figure>
+<ul>
+<li>结果</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">[root@etcd-host1 k8s]# systemctl status keepalived</span><br><span class="line">● keepalived.service - LVS and VRRP High Availabilitymonitor</span><br><span class="line">   Loaded: loaded (/usr/lib/systemd/system/keepalived.service; enabled; vendor preset: disabled)</span><br><span class="line">   Active: active (running) since Fri 2018-01-19 10:27:58 CST; 8h ago</span><br><span class="line"> Main PID: 1158 (keepalived)</span><br><span class="line">   CGroup: /system.slice/keepalived.service</span><br><span class="line">           ├─1158 /usr/sbin/keepalived -D</span><br><span class="line">           ├─1159 /usr/sbin/keepalived -D</span><br><span class="line">           └─1161 /usr/sbin/keepalived -D</span><br><span class="line"></span><br><span class="line">Jan 19 10:28:00 etcd-host1 Keepalived_vrrp[1161]: Sending gratuitous ARP on ens32 for 10.129.6.220</span><br><span class="line">Jan 19 10:28:05 etcd-host1 Keepalived_vrrp[1161]: VRRP_Instance(VI_1) Sending/queueing gratuitous ARPs on ens32 for 10.129.6.220</span><br></pre></td></tr></table></figure>
+<ul>
+<li>依次配置 其他2台从节点master 配置</li>
+</ul>
+<h3 id="提取k8s-rpm-包"><a href="#提取k8s-rpm-包" class="headerlink" title="提取k8s rpm 包"></a>提取k8s rpm 包</h3><ul>
+<li>默认由于某某出海问题</li>
+<li>我们离线导入下rpm 仓库</li>
+<li>安装官方YUM 仓库</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">cat &lt;&lt;EOF &gt; /etc/yum.repos.d/kubernetes.repo</span><br><span class="line">[kubernetes]</span><br><span class="line">name=Kubernetes</span><br><span class="line">baseurl=http://yum.kubernetes.io/repos/kubernetes-el7-x86_64</span><br><span class="line">enabled=1</span><br><span class="line">gpgcheck=1</span><br><span class="line">repo_gpgcheck=0</span><br><span class="line">gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg</span><br><span class="line">       https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg</span><br><span class="line">EOF</span><br></pre></td></tr></table></figure>
+<h3 id="安装kubeadm-kubectl-cni"><a href="#安装kubeadm-kubectl-cni" class="headerlink" title="安装kubeadm kubectl cni"></a>安装kubeadm kubectl cni</h3><ul>
+<li><p>下载镜像(自行搬梯子先获取rpm)</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">mkdir -p  /root/k8s/rpm</span><br><span class="line">cd /root/k8s/rpm</span><br><span class="line"></span><br><span class="line">#安装同步工具</span><br><span class="line">yum install -y yum-utils</span><br><span class="line"></span><br><span class="line">#同步本地镜像</span><br><span class="line">yumdownloader kubelet kubeadm kubectl kubernetes-cni docker</span><br><span class="line">scp root@10.129.6.224:/root/k8s/rpm/*  /root/k8s/rpm</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>离线安装</p>
+</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mkdir -p  /root/k8s/rpm</span><br><span class="line">scp root@10.129.6.211:/root/k8s/rpm/*  /root/k8s/rpm</span><br><span class="line">yum install  /root/k8s/rpm/*.rpm -y</span><br></pre></td></tr></table></figure>
+<ul>
+<li>启动k8s</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"># restart</span><br><span class="line">systemctl enable docker &amp;&amp; systemctl restart docker</span><br><span class="line">systemctl enable kubelet &amp;&amp; systemctl restart kubelet</span><br></pre></td></tr></table></figure>
+<h3 id="Etcd-https-集群部署（省略后期补充）"><a href="#Etcd-https-集群部署（省略后期补充）" class="headerlink" title="Etcd https 集群部署（省略后期补充）"></a>Etcd https 集群部署（省略后期补充）</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">步骤过多计划，后期完善下</span><br></pre></td></tr></table></figure>
+<h3 id="镜像获取方法"><a href="#镜像获取方法" class="headerlink" title="镜像获取方法"></a>镜像获取方法</h3><ul>
+<li><p>加速器获取 gcr.io k8s镜像 ，导出，导入镜像 或 上传本地仓库</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">国内可以使用daocloud加速器下载相关镜像，然后通过docker save、docker load把本地下载的镜像放到kubernetes集群的所在机器上，daocloud加速器链接如下：</span><br><span class="line">https://www.daocloud.io/mirror#accelerator-doc</span><br><span class="line"></span><br><span class="line">#pull 获取</span><br><span class="line">docker pull gcr.io/google_containers/kube-proxy-amd64:v1.9.0</span><br><span class="line"></span><br><span class="line">#导出</span><br><span class="line">mkdir -p docker-images</span><br><span class="line">docker save -o docker-images/kube-proxy-amd64  gcr.io/google_containers/kube-proxy-amd64:v1.9.0</span><br><span class="line"></span><br><span class="line">#导入</span><br><span class="line">docker load -i /root/kubeadm-ha/docker-images/kube-proxy-amd64</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>代理或vpn获取 gcr.io k8s镜 ,导出，导入镜像  或 上传本地仓库</p>
+</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">自谋生路，天机屋漏</span><br></pre></td></tr></table></figure>
+<h3 id="kubelet-指定本地镜像"><a href="#kubelet-指定本地镜像" class="headerlink" title="kubelet 指定本地镜像"></a>kubelet 指定本地镜像</h3><p>kubelet 修改 配置以使用本地自定义pause镜像<br>devhub.beisencorp.com/google_containers/pause-amd64:3.0 替换你的环境镜像<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">cat &gt; /etc/systemd/system/kubelet.service.d/20-pod-infra-image.conf &lt;&lt;EOF</span><br><span class="line">[Service]</span><br><span class="line">Environment=&quot;KUBELET_EXTRA_ARGS=--pod-infra-container-image=devhub.beisencorp.com/google_containers/pause-amd64:3.0&quot;</span><br><span class="line">EOF</span><br><span class="line">systemctl daemon-reload</span><br><span class="line">systemctl restart kubelet</span><br></pre></td></tr></table></figure></p>
+<h2 id="Kubeadm-Init-初始化"><a href="#Kubeadm-Init-初始化" class="headerlink" title="Kubeadm Init 初始化"></a>Kubeadm Init 初始化</h2><ul>
+<li><p>我们使用config 模板方式来初始化集群，便于我们指定etcd 集群</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">cat &lt;&lt;EOF &gt; config.yaml </span><br><span class="line">apiVersion: kubeadm.k8s.io/v1alpha1</span><br><span class="line">kind: MasterConfiguration</span><br><span class="line">etcd:</span><br><span class="line">  endpoints:</span><br><span class="line">  - https://10.129.6.211:2379</span><br><span class="line">  - https://10.129.6.212:2379</span><br><span class="line">  - https://10.129.6.213:2379</span><br><span class="line">  caFile: /etc/etcd/ssl/ca.pem </span><br><span class="line">  certFile: /etc/etcd/ssl/etcd.pem </span><br><span class="line">  keyFile: /etc/etcd/ssl/etcd-key.pem</span><br><span class="line">  dataDir: /var/lib/etcd</span><br><span class="line">networking:</span><br><span class="line">  podSubnet: 10.244.0.0/16</span><br><span class="line">kubernetesVersion: 1.9.0</span><br><span class="line">api:</span><br><span class="line">  advertiseAddress: &quot;10.129.6.220&quot;</span><br><span class="line">token: &quot;b99a00.a144ef80536d4344&quot;</span><br><span class="line">tokenTTL: &quot;0s&quot;</span><br><span class="line">apiServerCertSANs:</span><br><span class="line">- etcd-host1</span><br><span class="line">- etcd-host2</span><br><span class="line">- etcd-host3</span><br><span class="line">- 10.129.6.211</span><br><span class="line">- 10.129.6.212</span><br><span class="line">- 10.129.6.213</span><br><span class="line">- 10.129.6.220</span><br><span class="line">featureGates:</span><br><span class="line">  CoreDNS: true</span><br><span class="line">imageRepository: &quot;devhub.beisencorp.com/google_containers&quot;</span><br><span class="line">EOF</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>初始化集群</p>
+</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kubeadm init --config config.yaml</span><br></pre></td></tr></table></figure>
+<ul>
+<li><p>结果</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">To start using your cluster, you need to run the following as a regular user:</span><br><span class="line"></span><br><span class="line">  mkdir -p $HOME/.kube</span><br><span class="line">  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config</span><br><span class="line">  sudo chown $(id -u):$(id -g) $HOME/.kube/config</span><br><span class="line">as root:</span><br><span class="line"></span><br><span class="line">  kubeadm join --token b99a00.a144ef80536d4344 10.129.6.220:6443 --discovery-token-ca-cert-hash sha256:ebc2f64e9bcb14639f26db90288b988c90efc43828829c557b6b66bbe6d68dfa</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>查看node</p>
+</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">[root@etcd-host1 k8s]# kubectl get node</span><br><span class="line">NAME         STATUS    ROLES     AGE       VERSION</span><br><span class="line">etcd-host1   noReady     master    5h        v1.9.0</span><br><span class="line">[root@etcd-host1 k8s]# kubectl get cs</span><br><span class="line">NAME                 STATUS    MESSAGE              ERROR</span><br><span class="line">scheduler            Healthy   ok                   </span><br><span class="line">controller-manager   Healthy   ok                   </span><br><span class="line">etcd-1               Healthy   &#123;&quot;health&quot;: &quot;true&quot;&#125;   </span><br><span class="line">etcd-2               Healthy   &#123;&quot;health&quot;: &quot;true&quot;&#125;   </span><br><span class="line">etcd-0               Healthy   &#123;&quot;health&quot;: &quot;true&quot;&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>问题记录</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">如果使用kubeadm初始化集群，启动过程可能会卡在以下位置，那么可能是因为cgroup-driver参数与docker的不一致引起</span><br><span class="line">[apiclient] Created API client, waiting for the control plane to become ready</span><br><span class="line">journalctl -t kubelet -S &apos;2017-06-08&apos;查看日志，发现如下错误</span><br><span class="line">error: failed to run Kubelet: failed to create kubelet: misconfiguration: kubelet cgroup driver: &quot;systemd&quot;</span><br><span class="line">需要修改KUBELET_CGROUP_ARGS=--cgroup-driver=systemd为KUBELET_CGROUP_ARGS=--cgroup-driver=cgroupfs</span><br><span class="line"></span><br><span class="line">vi /etc/systemd/system/kubelet.service.d/10-kubeadm.conf</span><br><span class="line">#Environment=&quot;KUBELET_CGROUP_ARGS=--cgroup-driver=systemd&quot;</span><br><span class="line">Environment=&quot;KUBELET_CGROUP_ARGS=--cgroup-driver=cgroupfs&quot;</span><br><span class="line"></span><br><span class="line">systemctl daemon-reload &amp;&amp; systemctl restart kubelet</span><br></pre></td></tr></table></figure>
+<h2 id="安装网络组件-podnetwork"><a href="#安装网络组件-podnetwork" class="headerlink" title="安装网络组件 podnetwork"></a>安装网络组件 podnetwork</h2><ul>
+<li>我们选用kube-router </li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">wget https://github.com/cloudnativelabs/kube-router/blob/master/daemonset/kubeadm-kuberouter.yaml</span><br><span class="line"></span><br><span class="line">kubectl apply -f kubeadm-kuberouter.yaml</span><br></pre></td></tr></table></figure>
+<ul>
+<li>结果</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">[root@etcd-host1 k8s]# kubectl get po --all-namespaces</span><br><span class="line">NAMESPACE     NAME                                 READY     STATUS    RESTARTS   AGE</span><br><span class="line">kube-system   coredns-546545bc84-zc5dx             1/1       Running   0          6h</span><br><span class="line">kube-system   kube-apiserver-etcd-host1            1/1       Running   0          6h</span><br><span class="line">kube-system   kube-controller-manager-etcd-host1   1/1       Running   0          6h</span><br><span class="line">kube-system   kube-proxy-pfj7x                     1/1       Running   0          6h</span><br><span class="line">kube-system   kube-router-858b7                    1/1       Running   0          37m</span><br><span class="line">kube-system   kube-scheduler-etcd-host1            1/1       Running   0          6h</span><br><span class="line">[root@etcd-host1 k8s]#</span><br></pre></td></tr></table></figure>
+<h2 id="部署其他Master-节点"><a href="#部署其他Master-节点" class="headerlink" title="部署其他Master 节点"></a>部署其他Master 节点</h2><ul>
+<li><p>拷贝master01 配置 master02 master03</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">#拷贝pki 证书</span><br><span class="line">mkdir -p /etc/kubernetes/pki</span><br><span class="line">scp -r root@10.129.6.211:/etc/kubernetes/pki /etc/kubernetes</span><br><span class="line"></span><br><span class="line">#拷贝初始化配置</span><br><span class="line">scp -r root@10.129.6.211://root/k8s/config.yaml /etc/kubernetes/config.yaml</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>初始化 master02 master03</p>
+</li>
+<li><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">#初始化</span><br><span class="line">kubeadm init --config /etc/kubernetes/config.yaml</span><br></pre></td></tr></table></figure>
+</li>
+</ul>
+<p>-结果</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">[root@etcd-host2 k8s]# kubectl get node</span><br><span class="line">NAME         STATUS    ROLES     AGE       VERSION</span><br><span class="line">etcd-host1   Ready     master    6h        v1.9.0</span><br><span class="line">etcd-host2   Ready     master    5m        v1.9.0</span><br><span class="line">etcd-host3   Ready     master    49s       v1.9.0</span><br><span class="line">[root@etcd-host2 k8s]# kubectl get po --all-namespaces</span><br><span class="line">NAMESPACE     NAME                                 READY     STATUS    RESTARTS   AGE</span><br><span class="line">kube-system   coredns-546545bc84-zc5dx             1/1       Running   0          6h</span><br><span class="line">kube-system   kube-apiserver-etcd-host1            1/1       Running   0          6h</span><br><span class="line">kube-system   kube-apiserver-etcd-host2            1/1       Running   0          5m</span><br><span class="line">kube-system   kube-apiserver-etcd-host3            1/1       Running   0          46s</span><br><span class="line">kube-system   kube-controller-manager-etcd-host1   1/1       Running   0          6h</span><br><span class="line">kube-system   kube-controller-manager-etcd-host2   1/1       Running   0          5m</span><br><span class="line">kube-system   kube-controller-manager-etcd-host3   1/1       Running   0          46s</span><br><span class="line">kube-system   kube-proxy-gk95d                     1/1       Running   0          51s</span><br><span class="line">kube-system   kube-proxy-mrzbq                     1/1       Running   0          5m</span><br><span class="line">kube-system   kube-proxy-pfj7x                     1/1       Running   0          6h</span><br><span class="line">kube-system   kube-router-7xsbn                    1/1       Running   0          51s</span><br><span class="line">kube-system   kube-router-858b7                    1/1       Running   0          47m</span><br><span class="line">kube-system   kube-router-8hdh6                    1/1       Running   0          5m</span><br><span class="line">kube-system   kube-scheduler-etcd-host1            1/1       Running   0          6h</span><br><span class="line">kube-system   kube-scheduler-etcd-host2            1/1       Running   0          5m</span><br><span class="line">kube-system   kube-sche</span><br></pre></td></tr></table></figure>
+<hr>
+<h1 id="参观文档"><a href="#参观文档" class="headerlink" title="参观文档"></a>参观文档</h1><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">#k8s 官方文档</span><br><span class="line">https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/</span><br><span class="line"># kubeadm ha 项目文档</span><br><span class="line">https://github.com/indiketa/kubeadm-ha</span><br><span class="line">https://github.com/cookeem/kubeadm-ha/blob/master/README_CN.md</span><br><span class="line">https://medium.com/@bambash/ha-kubernetes-cluster-via-kubeadm-b2133360b198</span><br><span class="line"># kubespray 之前的kargo ansible项目</span><br><span class="line">https://github.com/kubernetes-incubator/kubespray/blob/master/docs/ha-mode.md</span><br></pre></td></tr></table></figure>
+
+        
+    </article>
+    <footer class="cube-excerpt-footer">
+        <a class="cube-excerpt-more" href="/2018/01/19/K8s-1-9实践-Kubeadm-HA-1-9-高可用-集群-本地离线部署/">阅读全文</a>
+    </footer>
+</div>
+
 <div class="cube-excerpt" id="cube-excerpt-[Kube-router 实践]K8s 1.9 Kube-router BGP外部对接发布内部路由 和 高可用">
     <header class="cube-excerpt-header">
         <h1><a href="/2018/01/09/Kube-router-实践-K8s-1-9-Kube-router/">[Kube-router 实践]K8s 1.9 Kube-router BGP外部对接发布内部路由 和 高可用</a></h1>
@@ -362,7 +604,7 @@
     
     
     <div class="count">
-        <a class="count articles"><span>3</span>文章</a>
+        <a class="count articles"><span>4</span>文章</a>
         <a class="count tags"><span>0</span>标签</a>
         <a class="count categories"><span>0</span>分类</a>
     </div>
@@ -401,7 +643,7 @@
                     <span>1</span>
                 </p>
                 <p class="title">
-                    <a href="/2018/01/09/Kube-router-实践-K8s-1-9-Kube-router/" title="[Kube-router 实践]K8s 1.9 Kube-router BGP外部对接发布内部路由 和 高可用">[Kube-router 实践]K8s 1.9 Kube-router BGP外部对接发布内部路由 和 高可用</a>
+                    <a href="/2018/01/19/K8s-1-9实践-Kubeadm-HA-1-9-高可用-集群-本地离线部署/" title="[K8s 1.9实践]Kubeadm HA 1.9 高可用 集群 本地离线部署">[K8s 1.9实践]Kubeadm HA 1.9 高可用 集群 本地离线部署</a>
                 </p>
             </div>
             
@@ -415,7 +657,7 @@
                     <span>2</span>
                 </p>
                 <p class="title">
-                    <a href="/2017/12/21/news/" title="Today ">Today </a>
+                    <a href="/2018/01/09/Kube-router-实践-K8s-1-9-Kube-router/" title="[Kube-router 实践]K8s 1.9 Kube-router BGP外部对接发布内部路由 和 高可用">[Kube-router 实践]K8s 1.9 Kube-router BGP外部对接发布内部路由 和 高可用</a>
                 </p>
             </div>
         </li>
@@ -426,6 +668,19 @@
             <div class="normal">
                 <p class="index">
                     <span>3</span>
+                </p>
+                <p class="title">
+                    <a href="/2017/12/21/news/" title="Today ">Today </a>
+                </p>
+            </div>
+        </li>
+        
+        
+        
+        <li>
+            <div class="normal">
+                <p class="index">
+                    <span>4</span>
                 </p>
                 <p class="title">
                     <a href="/2017/12/21/Nice-To-Meet-U/" title="Nice To Meet U">Nice To Meet U</a>
