@@ -204,6 +204,7 @@
 <h2 id="部署示意图"><a href="#部署示意图" class="headerlink" title="部署示意图"></a>部署示意图</h2><p><img src="http://omwdjgaw1.bkt.clouddn.com/blog/kubeadm-ha-map.jpg" alt="image"></p>
 <ul>
 <li>集群ha方案，我们力求简单，使用keepalive 监听一个vip来实现，（当节点不可以后，会有vip漂移的切换时长，取决于我们设置timeout切换时长，测试会有10s空档期，如果对高可用更高要求 可以用lvs或者nginx做 4层lb负载 更佳完美，我们力求简单够用，可接受10s的api不可用）</li>
+<li>etcd和master 测试采用 3节点共用部署，（生成环境可以考虑etcd和master分离或者等kubeadm ha正式版推出）</li>
 </ul>
 <hr>
 <h2 id="部署环境"><a href="#部署环境" class="headerlink" title="部署环境"></a>部署环境</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">最近在部署k8s 1.9集群遇到一些问题，整理记录，或许有助需要的朋友。</span><br><span class="line">因为kubeadm 简单便捷，所以集群基于该项目部署，目前bete版本不支持ha部署，github说2018年预计发布ha 版本，可我们等不及了 呼之欲来。。。</span><br></pre></td></tr></table></figure>
