@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <meta name="author" content="Ming">
+    
+    
+    
+    
+    
+    
+    <title>[高可用架构]----新数据中心高可用整理 | ZeMing</title>
+    <!-- inject:style -->
+    <link href="/css/style.css" rel="stylesheet" type="text/css">
+    <!-- endinject -->
+    <style>
+        .cube-loading {
+            top: 0;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background: url('/images/lg/loading.gif') no-repeat center center;
+            background-color: rgba(0,0,0,.7);
+        }
+
+        .cube-loading.out {
+            display: none;
+        }
+
+        .cube-loading:before {
+            display: block;
+            content: '加载中';
+            position: relative;
+            width: 100%;
+            top: 50%;
+            right: -50%;
+            color: #fff;
+        }
+
+        @media(max-width: 768px) {
+            .cube-loading:before {
+                font-size: 1.2em;
+                transform: translate(-24px,20px);
+                -webkit-transform: translate(-24px,20px);
+                -o-transform: translate(-24px,20px);
+                -ms-transform: translate(-24px,20px);
+            }
+        }
+
+        @media(min-width: 768px) {
+            .cube-loading:before {
+
+            }
+        }
+    </style>
+    
+</head>
+<body>
+<div class="cube-body">
+    <nav id="cube-top-memu" class="cube-menu">
+    <ul class="cube-menu-collapse">
+        
+        <li>
+            <i class="cube-icon cube-icon-home" aria-hidden="true"></i>
+            <a href="/">首页</a>
+        </li>
+        
+        <li>
+            <i class="cube-icon cube-icon-archive" aria-hidden="true"></i>
+            <a href="/archives">归档</a>
+        </li>
+        
+        <li>
+            <i class="cube-icon cube-icon-categories" aria-hidden="true"></i>
+            <a href="/categories">分类</a>
+        </li>
+        
+        <li>
+            <i class="cube-icon cube-icon-tags" aria-hidden="true"></i>
+            <a href="/tags">标签</a>
+        </li>
+        
+        <li>
+            <i class="cube-icon cube-icon-about" aria-hidden="true"></i>
+            <a href="/about-me">关于我</a>
+        </li>
+        
+    </ul>
+</nav>
+<nav class="cube-side-menu" id="cube-side-menu">
+    <ul class="cube-menu-list">
+        
+        <li>
+            <a class="lrc-control">开启歌词</a>
+        </li>
+        
+        <li>
+            <a class="scroll-to-top">回到顶部</a>
+        </li>
+    </ul>
+</nav>
+    <header class="cube-header" id="cube-header">
+    <img src=" http://cube-1252774894.cosgz.myqcloud.com/background.jpg " alt="头部背景图片">
+    
+    <div class="cube-type">
+        <span class="cube-typed-title">今晚月色很美、你说是的 -- ZeMing</span>
+        <span class="cube-typed-cursor">|</span>
+    </div>
+    
+</header>
+
+    <style>
+        nav.cube-menu:before {
+            content: '';
+            visibility: hidden;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 44px;
+        
+            filter: blur(5px);
+            -webkit-filter: blur(5px);
+        
+            z-index: -1;
+            background-image: url('http://cube-1252774894.cosgz.myqcloud.com/background.jpg');
+            background-repeat: no-repeat;
+            background-position: center -356px;
+            background-size: cover;
+            background-color: transparent;
+        }
+
+        header.cube-background.cube-header-background {
+            visibility: hidden;
+            background-image: url('http://cube-1252774894.cosgz.myqcloud.com/background.jpg');
+            background-position: center -400px;
+        }
+    </style>
+    <header class="cube-background cube-header-background">
+        
+        <div class="cube-type">
+            <span class="cube-typed-title">今晚月色很美、你说是的 -- ZeMing</span>
+            <span class="cube-typed-cursor">|</span>
+        </div>
+        
+    </header>
+    <div class="load-header-background"></div>
+    <script>
+        (function (window) {
+
+            window.headerModule = {}
+            window.headerModule.image = {
+                width: '2000',
+                height: '1014'
+            }
+
+        })(window)
+    </script>
+    
+    <div class="cube-content">
+        <div class="cube-left">
+            <div class="cube-article">
+    <h1 class="title">[高可用架构]----新数据中心高可用整理</h1>
+    
+    <div class="cube-article-header">
+        <div class="cube-article-date">
+            <i class="cube-icon cube-icon-date" aria-hidden="true"></i>
+            <!-- moment.js对象 -->
+            2018-02-06
+        </div>
+        <div class="cube-article-tags">
+    <i class="cube-icon cube-icon-tag" aria-hidden="true"></i>
+    
+    <a href="/tags/高可用/">#高可用</a>
+    
+</div>
+    </div>
+    
+    <div class="cube-article-content cube-markdown">
+        
+        <hr>
+<h1 id="新数据中心网络项目背景"><a href="#新数据中心网络项目背景" class="headerlink" title="新数据中心网络项目背景"></a>新数据中心网络项目背景</h1><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">#项目概述</span><br><span class="line">随着我们公司业务发展，异地旧数据中心，容量不足，已经无法满足，</span><br><span class="line">随着我们公司业务对稳定性高可用冗余性等更高要求，后期异地灾备，多活需要</span><br><span class="line">所以我们需要去构建 新的数据中心，面向未来</span><br></pre></td></tr></table></figure>
+<h2 id="旧数据中心-问题概述"><a href="#旧数据中心-问题概述" class="headerlink" title="旧数据中心-问题概述"></a>旧数据中心-问题概述</h2><ul>
+<li>容量不足，机柜无法满足业务部署</li>
+<li>网络质量不佳，影响客户体验</li>
+<li>历史遗留，由于历史部署原因，维护不便</li>
+<li>设备老化，技术落后，</li>
+<li>单点风险，VPN设备和出口单点</li>
+<li>安全需求，没有整网硬件防火墙</li>
+<li>千兆性能，万兆网络虚拟机需求</li>
+<li>多活机房，灾备机房需求</li>
+</ul>
+<h2 id="新数据中心，建设思路"><a href="#新数据中心，建设思路" class="headerlink" title="新数据中心，建设思路"></a>新数据中心，建设思路</h2><ul>
+<li>高可用 – 拒绝单点，冗余可靠</li>
+<li>高性能 – 越快越好，保障底层</li>
+<li>可拓展 – 方便扩容，模块部署</li>
+<li>易操作 – 方便维护，故障排错</li>
+<li>先进性 – 成熟可靠，实用领先</li>
+<li>安全性 – 安全可控，保障数据</li>
+<li>简单化 – 力求简单，结构清晰</li>
+<li>低延迟 – 万兆专线，高质低延</li>
+</ul>
+<h1 id="高可用网络要求"><a href="#高可用网络要求" class="headerlink" title="高可用网络要求"></a>高可用网络要求</h1><h2 id="高可用性的定义"><a href="#高可用性的定义" class="headerlink" title="高可用性的定义"></a>高可用性的定义</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">传统意义上的可用性（AVAILABILITY ）定义为系统正常运行时间占总运行时间的比例（当前的总运行时间包括出问题以后修复所耗费的时间）。</span><br><span class="line">高可用性由两个基本概念组成：</span><br><span class="line">　　MTBF（Mean Time Between Failure），系统平均正常运行时间</span><br><span class="line">　　MTTR（Mean Time to Repair），系统平均恢复时间</span><br><span class="line">　　可用性的计算公式： AVAILABILITY ＝ MTBF / ( MTBF + MTTR ) × 100%</span><br></pre></td></tr></table></figure>
+<h2 id="SLA可用率-与-故障时间-关联表"><a href="#SLA可用率-与-故障时间-关联表" class="headerlink" title="SLA可用率 与 故障时间 关联表"></a>SLA可用率 与 故障时间 关联表</h2><table>
+<thead>
+<tr>
+<th>可用性（每年）</th>
+<th>故障时间（每年）</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>98.000000%</td>
+<td>7.3天</td>
+<td></td>
+</tr>
+<tr>
+<td>99.000000%</td>
+<td>3.65天</td>
+<td></td>
+</tr>
+<tr>
+<td>99.900000%</td>
+<td>8.76小时</td>
+<td>AWS EC2  和阿里云ECS RDS 99.95%可用性</td>
+</tr>
+<tr>
+<td>99.990000%</td>
+<td>52.56分钟</td>
+<td>AWS  S3 99.99%可用性和99.999999999%持久性</td>
+</tr>
+<tr>
+<td>99.999000%</td>
+<td>5.256分钟</td>
+<td>即”5个9的可用性”</td>
+</tr>
+<tr>
+<td>99.999900%</td>
+<td>31.536秒</td>
+<td></td>
+</tr>
+<tr>
+<td>99.999990%</td>
+<td>3.1537秒</td>
+<td></td>
+</tr>
+<tr>
+<td>99.999999%</td>
+<td>0.31538秒</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>网络节点与网络链路的故障无法完全避免，所以提升网络可用性的重要方法之一是尽量降低系统的故障恢复时间。</li>
+</ul>
+<h3 id="高可用技术"><a href="#高可用技术" class="headerlink" title="高可用技术"></a>高可用技术</h3><p>数据中心网络高可用涉及技术：<br>分类分层 | 高可用技术 | 备注<br>—|—|—|—<br>物理设备 | 冗余电源、冗余风扇、冗余主控、板卡支持热插拔；  |<br>链路层面 | 以太网链路聚合（手工聚合、LACP）；  |<br>二层多路径 | STP、MSTP、SmartLink， VSS，VPC；  |<br>三层多路径 | VRRP、ECMP、动态路由协议多路径；  |<br>故障检测 | NQA、BFD、OAM、DLDP，FailOver；  |<br>不间断转发 | GR、热补丁升级；  |<br>L7多路径 | 状态热备、非对称路径转发；  |<br>数据中心服务高可用涉及技术：<br>存储冗余 | RAID,DRBD , San , NAS , GFS , CEPH；  |<br>二层冗余 | Bond 链路绑定 lvs-dr<br>三层冗余 | Keepalived, ECMP<br>四层冗余 | LVS （NAT TUNNEL  Full-NAT，<br>七层冗余 | Nginx,Haproxy<br>应用冗余 | Dubbox, spring cloud<br>容器冗余 | Swarm、Mesos ,Kubernetes<br>虚机冗余 | Vmware Vcenter , Openstack , Kvm</p>
+<p>在传统的数据中心三层网络结构中（如图1所示），由于存在多设备多路径冗余，就会存在环路结构，因此MSTP/VRRP/OSPF等处理多路径冗余的协议部署至关重要。一般在数据中心的核心到汇聚层间部署OSPF等动态路由协议，在汇聚层网关设备上部署VRRP处理多网关冗余，在汇聚层到接入层之间部署STP/MSTP解决二层网络环路冗余。当在汇聚层或核心层部署防火墙等基于4-7层的状态处理设备时，同时需要在多台设备间部署状态热备等特性。</p>
+<p>为了保证数据中心的设备和链路发生故障时业务流量能够快速收敛，还需要部署NQA、BFD、OAM和DLDP等路径检测协议以降低故障检测响应时间。同时可以部署GR等不间断转发协议协助动态路由协议在主备板切换情况下快速完成业务流量收敛。</p>
+<h1 id="网络方案"><a href="#网络方案" class="headerlink" title="网络方案"></a>网络方案</h1><h2 id="网络拓扑"><a href="#网络拓扑" class="headerlink" title="网络拓扑"></a>网络拓扑</h2><p><img src="http://omwdjgaw1.bkt.clouddn.com/blog/bj-net-map-pub.jpg" alt="image"></p>
+<h2 id="网络划分层"><a href="#网络划分层" class="headerlink" title="网络划分层"></a>网络划分层</h2><ul>
+<li>运营商汇聚层</li>
+<li>客户侧互联网接入层 </li>
+<li>客户侧出口层 </li>
+<li>客户侧核心层 </li>
+<li>客户侧接入层 </li>
+<li>客户侧服务器</li>
+</ul>
+<h2 id="网络分层冗余方式"><a href="#网络分层冗余方式" class="headerlink" title="网络分层冗余方式"></a>网络分层冗余方式</h2><table>
+<thead>
+<tr>
+<th>分层名称</th>
+<th>冗余方式</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>运营商汇聚层</td>
+<td>3种互联网接入 VRRP冗余和双静态路由和OSPF接入</td>
+<td>关于运营商接入感觉可以专门梳理一个小章节</td>
+</tr>
+<tr>
+<td>客户侧互联网接入层</td>
+<td>互联网双线，两台冗余交换级联</td>
+</tr>
+<tr>
+<td>客户侧出口层</td>
+<td>出口主备模式部署，用于NAT路由和防火墙</td>
+</tr>
+<tr>
+<td>客户侧核心层</td>
+<td>双核心，双主，双万兆 VPC协议互联</td>
+</tr>
+<tr>
+<td>客户侧接入层</td>
+<td>双万兆冗余交叉上联 核心交换</td>
+</tr>
+<tr>
+<td>客户侧服务器</td>
+<td>双线上联双交换机 ，主备线路或者双线hash捆绑</td>
+</tr>
+</tbody>
+</table>
+<h2 id="网络冗余测试方式"><a href="#网络冗余测试方式" class="headerlink" title="网络冗余测试方式"></a>网络冗余测试方式</h2><table>
+<thead>
+<tr>
+<th>分层名称</th>
+<th>测试方法</th>
+<th>验证冗余</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>运营商汇聚层</td>
+<td>上联接入运营商线故障拔线测试</td>
+<td>验证内部互联网是否正常 验证火墙主备 验证Vrrp切换</td>
+<td>OK</td>
+</tr>
+<tr>
+<td>客户侧互联网接入层</td>
+<td>接入交换机断电故障测试</td>
+<td>验证内部互联网是否正常 验证火墙主备  验证Vrrp切换</td>
+<td>OK</td>
+</tr>
+<tr>
+<td>客户侧出口层</td>
+<td>主备设备主备断电测试</td>
+<td>验证内部互联网是否正常 验证火墙主备</td>
+<td>OK</td>
+</tr>
+<tr>
+<td>客户侧核心层</td>
+<td>主备设备断电切换测试</td>
+<td>验证互联网和内网是否正常</td>
+<td>OK</td>
+</tr>
+<tr>
+<td>客户侧接入层</td>
+<td>设备故障断电切换测试</td>
+<td>验证互联网和内网是否正常</td>
+<td>OK</td>
+</tr>
+<tr>
+<td>客户侧服务器</td>
+<td>线路故障断电切换测试绑</td>
+<td>验证互联网和内网是否正常</td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">#1 测试结论，网络各层全冗余</span><br><span class="line">#2 切换时间测试 断电任意节点设备，网络均可以可以恢复正常通信 ，会有设备切换产生 1-3个切换丢包</span><br></pre></td></tr></table></figure>
+<h2 id="网段划分"><a href="#网段划分" class="headerlink" title="网段划分"></a>网段划分</h2><table>
+<thead>
+<tr>
+<th>Vlan ID</th>
+<th>描述</th>
+<th>IP地址段</th>
+<th>vPC ID</th>
+<th>Port-Channel ID</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>  10</td>
+<td>WEB</td>
+<td>10.123.10.0/24</td>
+<td></td>
+<td>—-</td>
+<td>用于WEB服务器</td>
+</tr>
+<tr>
+<td>  20</td>
+<td>APP</td>
+<td>10.123.10.0/24</td>
+<td></td>
+<td>—-</td>
+<td>用APP服务器</td>
+</tr>
+<tr>
+<td>  30</td>
+<td>DB</td>
+<td>10.123.10.0/24</td>
+<td></td>
+<td>—-</td>
+<td>用于DB服务器  </td>
+</tr>
+<tr>
+<td>  100</td>
+<td>ESXi</td>
+<td>10.123.10.0/24</td>
+<td></td>
+<td>—-</td>
+<td>用于Esxi服务器</td>
+</tr>
+<tr>
+<td>  110</td>
+<td>OPS</td>
+<td>10.123.10.0/24</td>
+<td></td>
+<td>—-</td>
+<td>用于OPS服务器</td>
+</tr>
+<tr>
+<td>  200</td>
+<td>MGT</td>
+<td>10.123.10.0/24</td>
+<td></td>
+<td>—-</td>
+<td>用于管理服务器</td>
+</tr>
+<tr>
+<td>  254</td>
+<td>Connect</td>
+<td>10.123.10.0/24</td>
+<td>254 253</td>
+<td>254 253</td>
+<td>用于互联设备</td>
+</tr>
+</tbody>
+</table>
+<h1 id="技术概要"><a href="#技术概要" class="headerlink" title="技术概要"></a>技术概要</h1><h2 id="VPC-交换技术（冗余性能）"><a href="#VPC-交换技术（冗余性能）" class="headerlink" title="VPC 交换技术（冗余性能）"></a>VPC 交换技术（冗余性能）</h2><p><img src="http://omwdjgaw1.bkt.clouddn.com/blog/vpc-5k-n2k.jpg" alt="image"><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">vPC(virtual PortChannel，虚拟链路聚合)技术</span><br><span class="line">允许将连接到两个Nexus系列交换机的物理链路视作一条逻辑端口聚合链路，再连接到其他设备。</span><br><span class="line">其他设备包括：Nexus 2000 系列的 Fabric Extender（后文暂且翻译为结构扩展器），交换机，服务器等其他任何的网络设备。</span><br><span class="line">vPC技术可以提供二层的多路径选择，让用户可以在有多条可选路径的情况下增加网络冗余度，同时实现提升带宽、在多个节点之间启用多条并行路径和对流量进行负载均衡。</span><br></pre></td></tr></table></figure></p>
+<h3 id="VPC技术与传统交换网络优势对比"><a href="#VPC技术与传统交换网络优势对比" class="headerlink" title="VPC技术与传统交换网络优势对比"></a>VPC技术与传统交换网络优势对比</h3><p><img src="http://omwdjgaw1.bkt.clouddn.com/blog/vpc-ols-new.png" alt="image"></p>
+<ul>
+<li>跨机箱多链路捆绑；</li>
+<li>避免以太网环路；</li>
+<li>增加链路带宽；</li>
+<li>双活的工作机制，支持双机箱双引擎性能；</li>
+<li>故障时可以实现快速收敛；</li>
+<li>网络架构简单、更可靠；</li>
+<li>有效使用 2 层带宽；</li>
+</ul>
+<h2 id="FailOver-故障转移技术（防火墙）"><a href="#FailOver-故障转移技术（防火墙）" class="headerlink" title="FailOver 故障转移技术（防火墙）"></a>FailOver 故障转移技术（防火墙）</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Failover</span><br><span class="line"></span><br><span class="line">Cisco防火墙一种高可用技术，能在防火墙发生故障时数秒内转移</span><br><span class="line">配置到另一台设备，使网络保持畅通，达到设备级冗余的目的。</span><br></pre></td></tr></table></figure>
+<ul>
+<li>故障转移 心跳线</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">故障转移配置的技术，需要两台完全一样的设备，通过一个连接，连接到对方（这个连接也叫心跳线）。该技术用到的两台设备分为 主用和备用，备用处于待机状态。当主用设备故障后，备用设备可启用，并设置为主用，运行自主用设备复制过来的配置（配置是跟随主用设备移动的）。</span><br></pre></td></tr></table></figure>
+<ul>
+<li>故障转移  状态线</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">同步NAT， TCP ,HTTP ,DHCP SSLvPN,等状态信息，保障长连接不丢失</span><br></pre></td></tr></table></figure>
+<h1 id="Vrrp-虚拟路由器冗余网关协议"><a href="#Vrrp-虚拟路由器冗余网关协议" class="headerlink" title="Vrrp 虚拟路由器冗余网关协议"></a>Vrrp 虚拟路由器冗余网关协议</h1><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">虚拟路由冗余协议（VRRP，Virtual Router Redundancy Protocol)是一种容错协议，保证当主机的下一跳路由器失效时，及时的由另一台路由器来替代，从而保持通信的连续性和可靠性。</span><br><span class="line">为了使VRRP工作，要在路由器中配置VRRP虚拟网关，使得网络上的主机与虚拟路由器通信，无需了解这个网络上物理路由器的任何信息。</span><br></pre></td></tr></table></figure>
+<h2 id="相关资料文档"><a href="#相关资料文档" class="headerlink" title="相关资料文档"></a>相关资料文档</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">#Nexus 交换机配置手册</span><br><span class="line">https://www.cisco.com/c/en/us/support/switches/nexus-5000-series-switches/products-installation-and-configuration-guides-list.html</span><br><span class="line"></span><br><span class="line">#ASA 防火墙配置手册</span><br><span class="line">https://www.cisco.com/c/en/us/td/docs/security/asa/asa94/config-guides/cli/firewall/asa-94-firewall-config.html</span><br></pre></td></tr></table></figure>
+<h2 id="注释"><a href="#注释" class="headerlink" title="注释"></a>注释</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ip相关信息均已修改。</span><br></pre></td></tr></table></figure>
+
+    </div>
+</div>
+
+<div class="cube-article-nav">
+    <ul>
+        
+        
+        <li class="next">
+            <a href="/2018/01/24/运维平台自建之路-OneOps运维平台，心路历程随想回望-开篇/">
+                [运维平台自建之路]OneOps运维平台，心路历程随想回望 -- 开篇
+                <i class="cube-icon cube-next" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+    </ul>
+</div>
+
+
+<!-- TODO 根据theme.comment的内容进行入口选择 -->
+
+<div class="changyan-container">
+    <div id="SOHUCS" sid="2018/02/06/高可用架构-新数据中心高可用整理/"></div>
+</div>
+
+<style>
+    #SOHUCS #SOHU_MAIN .module-cmt-notice {
+        z-index: -1!important;
+        visibility: hidden!important;
+    }
+</style>
+
+<script type="text/javascript">
+    (function(){
+        var appid = 'cytsbLNP0';
+        var conf = 'e09f9127b79e7c3876ae05d182fa9cef';
+        var width = window.innerWidth || document.documentElement.clientWidth;
+        if (width < 960) {
+            window.document.write('<script id="changyan_mobile_js" charset="utf-8" type="text/javascript" src="https://changyan.sohu.com/upload/mobile/wap-js/changyan_mobile.js?client_id=' + appid + '&conf=' + conf + '"><\/script>'); } else { var loadJs=function(d,a){var c=document.getElementsByTagName("head")[0]||document.head||document.documentElement;var b=document.createElement("script");b.setAttribute("type","text/javascript");b.setAttribute("charset","UTF-8");b.setAttribute("src",d);if(typeof a==="function"){if(window.attachEvent){b.onreadystatechange=function(){var e=b.readyState;if(e==="loaded"||e==="complete"){b.onreadystatechange=null;a()}}}else{b.onload=a}}c.appendChild(b)};loadJs("https://changyan.sohu.com/upload/changyan.js",function(){window.changyan.api.config({appid:appid,conf:conf})}); } })();
+</script>
+
+
+
+        </div>
+        <div class="cube-right">
+            
+
+<div class="cube-search cube-sidebar" id="cube-search">
+    <div class="search-container">
+        <input type="text" placeholder="搜索" class="cube-search-input" id="cube-search-input">
+        <i class="cube-icon cube-icon-search cube-search-submit" aria-hidden="true"></i>
+    </div>
+    <!-- TODO 通过给window赋一个全局变量，通过脚本赋值 -->
+</div>
+<script>
+    (function (window) {
+        'use strict';
+        window.searchModule = {}
+        window.searchModule.JSONUrl = '/content.json'
+        window.searchModule.rootUrl = '/'
+    })(window)
+</script>
+<div class="cube-search-form">
+    <div class="cube-search-control">
+        <input type="text" placeholder="搜索" class="search-input">
+        <a class="close-button">
+            <i class="cube-icon cube-close" aria-hidden="true"></i>
+        </a>
+    </div>
+    <div class="cube-search-result"></div>
+</div>
+
+
+<div class="cube-author cube-sidebar" id="cube-author">
+    
+    
+    <span>Ming</span>
+    
+    
+    <div class="count">
+        <a class="count articles"><span>7</span>文章</a>
+        <a class="count tags"><span>5</span>标签</a>
+        <a class="count categories"><span>1</span>分类</a>
+    </div>
+</div>
+
+
+
+<div class="cube-music cube-sidebar" id="cube-music">
+    <div class="cube-player aplayer" id="cube-player"></div>
+</div>
+<script>
+    (function (window) {
+        window.musicModule = {}
+        window.musicModule.musicConfig = '{"narrow":false,"autoplay":true,"showlrc":3,"theme":"#b7daff","mutex":true,"mode":"circulation","preload":"auto","listmaxheight":"513px","music":[{"title":"小幸运","author":"TRIPLANE","url":"http://up.xzdown.com/s/2017-12-23/1513992622.mp3","lrc":"http://cube-1252774894.cosgz.myqcloud.com/music/lrc/Dear friends - TRIPLANE.lrc","pic":"https://b-ssl.duitang.com/uploads/item/201603/23/20160323130612_fTBkj.jpeg"},{"title":"Fly","author":"和田光司","url":"http://up.xzdown.com/s/2017-12-23/1513992622.mp3","lrc":"http://cube-1252774894.cosgz.myqcloud.com/music/lrc/Butter-Fly (ピアノヴァージョン) - 和田光司.lrc","pic":"http://cube-1252774894.cosgz.myqcloud.com/music/image/和田光司 - Butter-Fly (ピアノヴァージョン).jpg"}]}'
+        window.musicModule.lrcConfig = {
+            open: '开启歌词',
+            close: '关闭歌词'
+        }
+    })(window)
+</script>
+
+
+
+<div class="cube-recent-posts cube-sidebar" id="cube-recent-posts">
+    <div class="title">
+        <a>近期文章</a>
+    </div>
+    <ul class="list">
+        
+        
+        <li>
+            <!-- TODO 如果文章要显示图片，那么在front-matter上添加preview属性(url or path) -->
+            
+            <div class="normal">
+                <p class="index first">
+                    <span>1</span>
+                </p>
+                <p class="title">
+                    <a href="/2018/02/06/高可用架构-新数据中心高可用整理/" title="[高可用架构]----新数据中心高可用整理">[高可用架构]----新数据中心高可用整理</a>
+                </p>
+            </div>
+            
+        </li>
+        
+        
+        
+        <li>
+            <div class="normal">
+                <p class="index">
+                    <span>2</span>
+                </p>
+                <p class="title">
+                    <a href="/2018/01/24/运维平台自建之路-OneOps运维平台，心路历程随想回望-开篇/" title="[运维平台自建之路]OneOps运维平台，心路历程随想回望 -- 开篇">[运维平台自建之路]OneOps运维平台，心路历程随想回望 -- 开篇</a>
+                </p>
+            </div>
+        </li>
+        
+        
+        
+        <li>
+            <div class="normal">
+                <p class="index">
+                    <span>3</span>
+                </p>
+                <p class="title">
+                    <a href="/2018/01/19/K8s-1-9实践-Kubeadm-HA-1-9-高可用-集群-本地离线部署/" title="[K8s 1.9实践]Kubeadm HA 1.9 高可用 集群 本地离线部署">[K8s 1.9实践]Kubeadm HA 1.9 高可用 集群 本地离线部署</a>
+                </p>
+            </div>
+        </li>
+        
+        
+        
+        <li>
+            <div class="normal">
+                <p class="index">
+                    <span>4</span>
+                </p>
+                <p class="title">
+                    <a href="/2018/01/09/Kube-router-实践-K8s-1-9-Kube-router/" title="[Kube-router 实践]K8s 1.9 Kube-router BGP外部对接发布内部路由 和 高可用">[Kube-router 实践]K8s 1.9 Kube-router BGP外部对接发布内部路由 和 高可用</a>
+                </p>
+            </div>
+        </li>
+        
+        
+        
+        <li>
+            <div class="normal">
+                <p class="index">
+                    <span>5</span>
+                </p>
+                <p class="title">
+                    <a href="/2017/12/21/news/" title="Today ">Today </a>
+                </p>
+            </div>
+        </li>
+        
+        
+    </ul>
+</div>
+
+
+
+<div class="cube-categories cube-sidebar" id="cube-categories">
+    <div class="title">
+        <a href="/categories">分类</a>
+    </div>
+    <div class="cube-boxs">
+        
+        
+        <div class="cube-box ">
+            <a href="/categories/运维平台/">#运维平台</a>
+        </div>
+        
+    </div>
+</div>
+
+
+
+<div class="cube-tagcloud cube-sidebar" id="cube-tagcloud">
+    <div class="title">
+        <a href="/tags">标签云</a>
+    </div>
+    <div class="cube-boxs">
+        
+        
+        <div class="cube-box-bg ">
+            <a href="/tags/高可用/">#高可用</a>
+        </div>
+        
+        
+        <div class="cube-box-bg ">
+            <a href="/tags/k8s/">#k8s</a>
+        </div>
+        
+        
+        <div class="cube-box-bg ">
+            <a href="/tags/kuberneters/">#kuberneters</a>
+        </div>
+        
+        
+        <div class="cube-box-bg ">
+            <a href="/tags/kubernetes/">#kubernetes</a>
+        </div>
+        
+        
+        <div class="cube-box ">
+            <a href="/tags/运维平台/">#运维平台</a>
+        </div>
+        
+    </div>
+</div>
+
+
+
+<div class="cube-links cube-sidebar" id="cube-links">
+    <div class="title">
+        <a>个人链接</a>
+    </div>
+    <ul class="list">
+        
+        <li>
+            
+            
+            <img src="http://cube-1252774894.cosgz.myqcloud.com/links/GitHub.png">
+            
+            <a href="https://github.com/ZEROKISEKI" target="_blank">GitHub</a>
+        </li>
+        
+        <li>
+            
+            
+            <img src="http://cube-1252774894.cosgz.myqcloud.com/links/Coding.png">
+            
+            <a href="https://coding.net/u/SORA1" target="_blank">Coding</a>
+        </li>
+        
+        <li>
+            
+            
+            <img src="http://cube-1252774894.cosgz.myqcloud.com/links/SF.png">
+            
+            <a href="https://segmentfault.com/u/aonosora" target="_blank">SF社区</a>
+        </li>
+        
+        <li>
+            
+            
+            <img src="http://cube-1252774894.cosgz.myqcloud.com/links/开发者头条.png">
+            
+            <a href="https://toutiao.io/u/148070" target="_blank">开发者头条</a>
+        </li>
+        
+    </ul>
+</div>
+
+
+
+<div class="cube-friend-links cube-sidebar" id="cube-friend-links">
+    <div class="title">
+        <a>友情链接</a>
+    </div>
+    <ul class="list">
+        
+        <li>
+            <!-- TODO change avatar.png to friend.png-->
+            <img src="http://cube-1252774894.cosgz.myqcloud.com/friend_links/micblo.png">
+            <a href="http://www.infoq.com/cn/" target="_blank">InforQ</a>
+        </li>
+        
+        <li>
+            <!-- TODO change avatar.png to friend.png-->
+            <img src="http://cube-1252774894.cosgz.myqcloud.com/friend_links/DIYgod.jpg">
+            <a href="https://www.51cto.com/" target="_blank">51Cto</a>
+        </li>
+        
+        <li>
+            <!-- TODO change avatar.png to friend.png-->
+            <img src="/images/friend_links.jpg ">
+            <a href="https://alibaba.com/" target="_blank">Futher</a>
+        </li>
+        
+    </ul>
+</div>
+
+
+        </div>
+    </div>
+</div>
+<footer class="cube-footer">
+    
+© 2015 ❤ Ming
+
+<br>
+<script>
+var _hmt = _hmt || [];
+(function() {
+  var hm = document.createElement("script");
+  hm.src = "https://hm.baidu.com/hm.js?5ff98e02317436145506b4eaabdc7643";
+  var s = document.getElementsByTagName("script")[0]; 
+  s.parentNode.insertBefore(hm, s);
+})();
+</script>
+Powered by <a href="https://hexo.io/" target="_blank">Hexo</a>.&nbsp;Theme by <a href="https://github.com/ZEROKISEKI" target="_blank">Zeming</a>
+
+</footer>
+<!-- inject:script -->
+<script src="/js/script.js"></script>
+<!-- endinject -->
+<div class="cube-loading out"></div>
+</body>
+</html>
