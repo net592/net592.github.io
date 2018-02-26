@@ -10,7 +10,7 @@
     
     
     
-    <title>[K8s 1.9实践]Kubeadm HA 1.9 高可用 集群 本地离线部署 | ZeMing</title>
+    <title>[K8s 1.9实践]Kubeadm HA 1.9 高可用 集群 本地离线部署-V20180226 | ZeMing</title>
     <!-- inject:style -->
     <link href="/css/style.css" rel="stylesheet" type="text/css">
     <!-- endinject -->
@@ -161,7 +161,7 @@
     <div class="cube-content">
         <div class="cube-left">
             <div class="cube-article">
-    <h1 class="title">[K8s 1.9实践]Kubeadm HA 1.9 高可用 集群 本地离线部署</h1>
+    <h1 class="title">[K8s 1.9实践]Kubeadm HA 1.9 高可用 集群 本地离线部署-V20180226</h1>
     
     <div class="cube-article-header">
         <div class="cube-article-date">
@@ -197,7 +197,7 @@
 <li>kube-scheduler：调度器 （内部自选举）集群Pod的调度中心；默认kubeadm安装情况下–leader-elect参数已经设置为true，保证master集群中只有一个kube-scheduler处于活跃状态；</li>
 <li>kube-controller-manager： 控制器 （内部自选举）集群状态管理器，当集群状态与期望不同时，kcm会努力让集群恢复期望状态，比如：当一个pod死掉，kcm会努力新建一个pod来恢复对应replicas set期望的状态；默认kubeadm安装情况下–leader-elect参数已经设置为true，保证master集群中只有一个kube-controller-manager处于活跃状态；</li>
 <li>kubelet: agent node注册apiserver</li>
-<li>kube-proxy: 每个node上一个，负责service vip到endpoint pod的流量转发，老版本主要通过设置iptables规则实现，新版1.9基于kube-proxy-lvs 实现</li>
+<li>kube-proxy: 每个node上一个，负责service vip到endpoint pod的流量转发，老版本主要通过设置iptables规则实现，新版1.9基于kube-proxy-lvs 实现 更好性能和负载拓展</li>
 </ul>
 <hr>
 <h2 id="部署示意图"><a href="#部署示意图" class="headerlink" title="部署示意图"></a>部署示意图</h2><p><img src="http://omwdjgaw1.bkt.clouddn.com/blog/kubeadm-ha-map.jpg" alt="image"></p>
@@ -389,6 +389,7 @@
 <li>我们离线导入下rpm 仓库</li>
 <li>安装官方YUM 仓库</li>
 </ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"># kubeadm 1.9.0版本RPM离线包，有朋友说翻墙困难</span><br><span class="line">链接：https://pan.baidu.com/s/1snaAVpV 密码：rcwo</span><br></pre></td></tr></table></figure>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">cat &lt;&lt;EOF &gt; /etc/yum.repos.d/kubernetes.repo</span><br><span class="line">[kubernetes]</span><br><span class="line">name=Kubernetes</span><br><span class="line">baseurl=http://yum.kubernetes.io/repos/kubernetes-el7-x86_64</span><br><span class="line">enabled=1</span><br><span class="line">gpgcheck=1</span><br><span class="line">repo_gpgcheck=0</span><br><span class="line">gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg</span><br><span class="line">       https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg</span><br><span class="line">EOF</span><br></pre></td></tr></table></figure>
 <h3 id="安装kubeadm-kubectl-cni"><a href="#安装kubeadm-kubectl-cni" class="headerlink" title="安装kubeadm kubectl cni"></a>安装kubeadm kubectl cni</h3><ul>
 <li>下载镜像(自行搬梯子先获取rpm)</li>
@@ -463,7 +464,8 @@
 <h4 id="观察主备VIP切换过程"><a href="#观察主备VIP切换过程" class="headerlink" title="观察主备VIP切换过程"></a>观察主备VIP切换过程</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">#观察当Master01主节点关闭后，被节点VIP状态  BACKUP  切换到 MASTER </span><br><span class="line">[root@etcd-host2 net.d]# systemctl status keepalived</span><br><span class="line">● keepalived.service - LVS and VRRP High Availability Monitor</span><br><span class="line">   Loaded: loaded (/usr/lib/systemd/system/keepalived.service; enabled; vendor preset: disabled)</span><br><span class="line">   Active: active (running) since Tue 2018-01-22 13:54:17 CST; 21s ago</span><br><span class="line"></span><br><span class="line">Jan 22 13:54:17 etcd-host2 Keepalived_vrrp[15908]: VRRP_Instance(VI_1) Transition to MASTER STATE</span><br><span class="line">Jan 22 13:54:17 etcd-host2 Keepalived_vrrp[15908]: VRRP_Instance(VI_1) Received advert with higher priority 120, ours 110</span><br><span class="line">Jan 22 13:54:17 etcd-host2 Keepalived_vrrp[15908]: VRRP_Instance(VI_1) Entering BACKUP STATE</span><br><span class="line"></span><br><span class="line">#切换到 MASTER </span><br><span class="line">[root@etcd-host2 net.d]# systemctl status keepalived</span><br><span class="line">● keepalived.service - LVS and VRRP High Availability Monitor</span><br><span class="line">   Loaded: loaded (/usr/lib/systemd/system/keepalived.service; enabled; vendor preset: disabled)</span><br><span class="line">   Active: active (running) since Tue 2018-01-22 13:54:17 CST; 4min 6s ago</span><br><span class="line">           </span><br><span class="line">Jan 22 14:03:02 etcd-host2 Keepalived_vrrp[15908]: VRRP_Instance(VI_1) Transition to MASTER STATE</span><br><span class="line">Jan 22 14:03:03 etcd-host2 Keepalived_vrrp[15908]: VRRP_Instance(VI_1) Entering MASTER STATE</span><br><span class="line">Jan 22 14:03:03 etcd-host2 Keepalived_vrrp[15908]: VRRP_Instance(VI_1) setting protocol VIPs.</span><br><span class="line">Jan 22 14:03:03 etcd-host2 Keepalived_vrrp[15908]: Sending gratuitous ARP on ens32 for 10.129.6.220</span><br></pre></td></tr></table></figure>
 <h4 id="验证集群高可用"><a href="#验证集群高可用" class="headerlink" title="验证集群高可用"></a>验证集群高可用</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">#观察 master01 关机后状态变成NotReady</span><br><span class="line">[root@etcd-host3 ~]# while true; do  sleep 1; kubectl get node;date; done</span><br><span class="line">Tue Jan 22 14:03:16 CST 2018</span><br><span class="line">NAME         STATUS    ROLES     AGE       VERSION</span><br><span class="line">etcd-host1   Ready     master    19m       v1.9.0</span><br><span class="line">etcd-host2   Ready     master    3d        v1.9.0</span><br><span class="line">etcd-host3   Ready     master    3d        v1.9.0</span><br><span class="line">Tue Jan 22 14:03:17 CST 2018</span><br><span class="line">NAME         STATUS     ROLES     AGE       VERSION</span><br><span class="line">etcd-host1   NotReady   master    19m       v1.9.0</span><br><span class="line">etcd-host2   Ready      master    3d        v1.9.0</span><br><span class="line">etcd-host3   Ready      master    3d        v1.9.0</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">#恢复Master主节点后，出现VIP偏移过来，api恢复</span><br><span class="line">The connection to the server 10.129.6.220:6443 was refused - did you specify the right host or port?</span><br><span class="line">Tue Jan 23 14:14:05 CST 2018</span><br><span class="line">The connection to the server 10.129.6.220:6443 was refused - did you specify the right host or port?</span><br><span class="line">Tue Jan 23 14:14:07 CST 2018</span><br><span class="line">Tue Jan 23 14:14:18 CST 2018</span><br><span class="line">NAME         STATUS     ROLES     AGE       VERSION</span><br><span class="line">etcd-host1   NotReady   master    29m       v1.9.0</span><br><span class="line">etcd-host2   Ready      master    3d        v1.9.0</span><br><span class="line">etcd-host3   Ready      master    3d        v1.9.0</span><br><span class="line">Tue Jan 23 14:14:20 CST 2018</span><br><span class="line">NAME         STATUS    ROLES     AGE       VERSION</span><br><span class="line">etcd-host1   Ready     master    29m       v1.9.0</span><br><span class="line">etcd-host2   Ready     master    3d        v1.9.0</span><br><span class="line">etcd-host3   Ready     master    3d        v1.9.0</span><br></pre></td></tr></table></figure>
 <hr>
-<h1 id="参观文档"><a href="#参观文档" class="headerlink" title="参观文档"></a>参观文档</h1><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">#k8s 官方文档</span><br><span class="line">https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/</span><br><span class="line"># kubeadm ha 项目文档</span><br><span class="line">https://github.com/indiketa/kubeadm-ha</span><br><span class="line">https://github.com/cookeem/kubeadm-ha/blob/master/README_CN.md</span><br><span class="line">https://medium.com/@bambash/ha-kubernetes-cluster-via-kubeadm-b2133360b198</span><br><span class="line"># kubespray 之前的kargo ansible项目</span><br><span class="line">https://github.com/kubernetes-incubator/kubespray/blob/master/docs/ha-mode.md</span><br><span class="line"># 若转载请注明出处 By Zeming</span><br><span class="line">http://xuzeming.top/2018/01/19/K8s-1-9%E5%AE%9E%E8%B7%B5-Kubeadm-HA-1-9-%E9%AB%98%E5%8F%AF%E7%94%A8-%E9%9B%86%E7%BE%A4-%E6%9C%AC%E5%9C%B0%E7%A6%BB%E7%BA%BF%E9%83%A8%E7%BD%B2/</span><br></pre></td></tr></table></figure>
+<h1 id="参观文档"><a href="#参观文档" class="headerlink" title="参观文档"></a>参观文档</h1><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">#k8s 官方文档</span><br><span class="line">https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/</span><br><span class="line">#kubeadm ha 项目文档</span><br><span class="line">https://github.com/indiketa/kubeadm-ha</span><br><span class="line">https://github.com/cookeem/kubeadm-ha/blob/master/README_CN.md</span><br><span class="line">https://medium.com/@bambash/ha-kubernetes-cluster-via-kubeadm-b2133360b198</span><br><span class="line">#kubespray 之前的kargo ansible项目</span><br><span class="line">https://github.com/kubernetes-incubator/kubespray/blob/master/docs/ha-mode.md</span><br><span class="line">#若有问题或转载请注明出处 By Zeming</span><br></pre></td></tr></table></figure>
+<p><a href="http://xuzeming.top/2018/01/19/K8s-1-9%E5%AE%9E%E8%B7%B5-Kubeadm-HA-1-9-%E9%AB%98%E5%8F%AF%E7%94%A8-%E9%9B%86%E7%BE%A4-%E6%9C%AC%E5%9C%B0%E7%A6%BB%E7%BA%BF%E9%83%A8%E7%BD%B2/">http://xuzeming.top/2018/01/19/K8s-1-9%E5%AE%9E%E8%B7%B5-Kubeadm-HA-1-9-%E9%AB%98%E5%8F%AF%E7%94%A8-%E9%9B%86%E7%BE%A4-%E6%9C%AC%E5%9C%B0%E7%A6%BB%E7%BA%BF%E9%83%A8%E7%BD%B2/</a></p>
 
     </div>
 </div>
@@ -630,7 +632,7 @@
                     <span>4</span>
                 </p>
                 <p class="title">
-                    <a href="/2018/01/19/K8s-1-9实践-Kubeadm-HA-1-9-高可用-集群-本地离线部署/" title="[K8s 1.9实践]Kubeadm HA 1.9 高可用 集群 本地离线部署">[K8s 1.9实践]Kubeadm HA 1.9 高可用 集群 本地离线部署</a>
+                    <a href="/2018/01/19/K8s-1-9实践-Kubeadm-HA-1-9-高可用-集群-本地离线部署/" title="[K8s 1.9实践]Kubeadm HA 1.9 高可用 集群 本地离线部署-V20180226">[K8s 1.9实践]Kubeadm HA 1.9 高可用 集群 本地离线部署-V20180226</a>
                 </p>
             </div>
         </li>
@@ -661,7 +663,7 @@
     <div class="cube-boxs">
         
         
-        <div class="cube-box ">
+        <div class="cube-box-bg ">
             <a href="/categories/运维平台/">#运维平台</a>
         </div>
         
@@ -677,7 +679,7 @@
     <div class="cube-boxs">
         
         
-        <div class="cube-box-bg ">
+        <div class="cube-box ">
             <a href="/tags/k8s/">#k8s</a>
         </div>
         
@@ -692,12 +694,12 @@
         </div>
         
         
-        <div class="cube-box ">
+        <div class="cube-box-bg ">
             <a href="/tags/运维平台/">#运维平台</a>
         </div>
         
         
-        <div class="cube-box-bg ">
+        <div class="cube-box ">
             <a href="/tags/高可用/">#高可用</a>
         </div>
         
